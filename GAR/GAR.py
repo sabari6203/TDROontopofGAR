@@ -2,30 +2,19 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
 
-def build_mlp(mlp_in, hidden_dims, act, drop_rate, is_training, scope_name, bn_first=True):
-    with tf.variable_scope(scope_name):
-        hidden = mlp_in
-        if bn_first:
-            hidden = tf.keras.layers.BatchNormalization(training=is_training,
-                                                       scale=False,
-                                                       name='mlp_bn_1')(hidden)  # Updated
-        hidden = tf.keras.layers.Dense(hidden_dims[0],
-                                       kernel_initializer=tf.glorot_uniform_initializer(),
-                                       kernel_regularizer=tf.keras.regularizers.l2(1e-3),
-                                       name="mlp_fc_1")(hidden)
-        for i in range(2, len(hidden_dims) + 1):
-            if act == 'relu':
-                hidden = tf.nn.leaky_relu(hidden, alpha=0.01)
-            hidden = tf.keras.layers.BatchNormalization(training=is_training,
-                                                       name='mlp_bn_' + str(i))(hidden)  # Updated
-            if act == 'tanh':
-                hidden = tf.nn.tanh(hidden)
-            hidden = tf.layers.dropout(hidden, rate=drop_rate, training=is_training, name='mlp_drop_' + str(i))
-            hidden = tf.keras.layers.Dense(hidden_dims[i - 1],
-                                           kernel_initializer=tf.glorot_uniform_initializer(),
-                                           kernel_regularizer=tf.keras.regularizers.l2(1e-3),
-                                           name='mlp_fc_' + str(i))(hidden)
-        return hidden
+def build_mlp(inputs, hid_dims, act, drop_rate, is_training, name, norm):
+    hidden = inputs
+    for i, dim in enumerate(hid_dims):
+        hidden = tf.keras.layers.Dense(dim, name=f'{name}_fc{i}')(hidden)
+        
+        if norm:
+            bn = tf.keras.layers.BatchNormalization(name=f'{name}_bn{i}')
+            hidden = bn(hidden, training=is_training)  # Call with training flag
+
+        hidden = tf.keras.layers.Activation(act, name=f'{name}_act{i}')(hidden)
+        hidden = tf.keras.layers.Dropout(drop_rate, name=f'{name}_drop{i}')(hidden)
+    
+    return hidden
 
 
 class GAR(object):
