@@ -2,19 +2,25 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
 
-def build_mlp(inputs, hid_dims, act, drop_rate, is_training, name, norm):
+
+def build_mlp(inputs, hid_dims, act, drop_rate, is_training, name, norm=True, bn_first=False):
     hidden = inputs
     for i, dim in enumerate(hid_dims):
+        if norm and bn_first:
+            bn = tf.keras.layers.BatchNormalization(name=f'{name}_bn{i}')
+            hidden = bn(hidden, training=is_training)
+
         hidden = tf.keras.layers.Dense(dim, name=f'{name}_fc{i}')(hidden)
         
-        if norm:
+        if norm and not bn_first:
             bn = tf.keras.layers.BatchNormalization(name=f'{name}_bn{i}')
-            hidden = bn(hidden, training=is_training)  # Call with training flag
+            hidden = bn(hidden, training=is_training)
 
         hidden = tf.keras.layers.Activation(act, name=f'{name}_act{i}')(hidden)
         hidden = tf.keras.layers.Dropout(drop_rate, name=f'{name}_drop{i}')(hidden)
-    
+
     return hidden
+
 
 
 class GAR(object):
