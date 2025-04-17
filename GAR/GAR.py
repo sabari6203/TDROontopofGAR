@@ -1,6 +1,6 @@
 import numpy as np
-import tensorflow as tf
-
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 
 def build_mlp(mlp_in, hidden_dims, act, drop_rate, is_training, scope_name, bn_first=True):
     with tf.variable_scope(scope_name):
@@ -46,12 +46,12 @@ class GAR(object):
         self.g_act = 'tanh'
         self.d_act = 'tanh'
 
-        self.content = tf.placeholder(tf.float32, [None, content_dim], name='condition')
-        self.real_emb = tf.placeholder(tf.float32, [None, emb_dim], name='real_emb')
-        self.neg_emb = tf.placeholder(tf.float32, [None, emb_dim], name='neg_emb')
-        self.opp_emb = tf.placeholder(tf.float32, [None, emb_dim], name='opp_emb')
-        self.g_training = tf.placeholder(tf.bool, name='G_is_training')
-        self.d_training = tf.placeholder(tf.bool, name='D_is_training')
+        self.content = tf.compat.v1.placeholder(tf.float32, [None, content_dim], name='condition')
+        self.real_emb = tf.compat.v1.placeholder(tf.float32, [None, emb_dim], name='real_emb')
+        self.neg_emb = tf.compat.v1.placeholder(tf.float32, [None, emb_dim], name='neg_emb')
+        self.opp_emb = tf.compat.v1.placeholder(tf.float32, [None, emb_dim], name='opp_emb')
+        self.g_training = tf.compat.v1.placeholder(tf.bool, name='G_is_training')
+        self.d_training = tf.compat.v1.placeholder(tf.bool, name='D_is_training')
 
         # build generator and discriminator's output
         self.gen_emb = self.build_generator(
