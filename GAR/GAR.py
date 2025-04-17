@@ -2,21 +2,23 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
 
+
 def build_mlp(inputs, hid_dims, act, drop_rate, is_training, name, norm=True, bn_first=False):
     hidden = inputs
     for i, dim in enumerate(hid_dims):
         if norm and bn_first:
-            hidden = tf.compat.v1.layers.batch_normalization(hidden, training=is_training, name=f'{name}_bn{i}')
+            hidden = tf.compat.v1.keras.layers.BatchNormalization(name=f'{name}_bn{i}')(hidden, training=is_training)
 
-        hidden = tf.compat.v1.layers.dense(hidden, dim, name=f'{name}_fc{i}')
+        hidden = tf.compat.v1.keras.layers.Dense(dim, name=f'{name}_fc{i}')(hidden)
 
         if norm and not bn_first:
-            hidden = tf.compat.v1.layers.batch_normalization(hidden, training=is_training, name=f'{name}_bn{i}')
+            hidden = tf.compat.v1.keras.layers.BatchNormalization(name=f'{name}_bn{i}')(hidden, training=is_training)
 
         hidden = tf.nn.dropout(hidden, rate=drop_rate, name=f'{name}_drop{i}')
         hidden = tf.nn.relu(hidden, name=f'{name}_act{i}') if act == 'relu' else tf.keras.activations.get(act)(hidden)
 
     return hidden
+
 
 
 
