@@ -6,27 +6,24 @@ def build_mlp(mlp_in, hidden_dims, act, drop_rate, is_training, scope_name, bn_f
     with tf.variable_scope(scope_name):
         hidden = mlp_in
         if bn_first:
-            hidden = tf.layers.batch_normalization(hidden,
-                                                 training=is_training,
-                                                 scale=False,
-                                                 name='mlp_bn_1')
-        # Replace tf.contrib.layers.l2_regularizer with tf.keras.regularizers.l2
+            hidden = tf.keras.layers.BatchNormalization(training=is_training,
+                                                       scale=False,
+                                                       name='mlp_bn_1')(hidden)  # Updated
         hidden = tf.keras.layers.Dense(hidden_dims[0],
                                        kernel_initializer=tf.glorot_uniform_initializer(),
-                                       kernel_regularizer=tf.keras.regularizers.l2(1e-3),  # Updated regularizer
+                                       kernel_regularizer=tf.keras.regularizers.l2(1e-3),
                                        name="mlp_fc_1")(hidden)
         for i in range(2, len(hidden_dims) + 1):
             if act == 'relu':
                 hidden = tf.nn.leaky_relu(hidden, alpha=0.01)
-            hidden = tf.layers.batch_normalization(hidden,
-                                                 training=is_training,
-                                                 name='mlp_bn_' + str(i))
+            hidden = tf.keras.layers.BatchNormalization(training=is_training,
+                                                       name='mlp_bn_' + str(i))(hidden)  # Updated
             if act == 'tanh':
                 hidden = tf.nn.tanh(hidden)
             hidden = tf.layers.dropout(hidden, rate=drop_rate, training=is_training, name='mlp_drop_' + str(i))
             hidden = tf.keras.layers.Dense(hidden_dims[i - 1],
                                            kernel_initializer=tf.glorot_uniform_initializer(),
-                                           kernel_regularizer=tf.keras.regularizers.l2(1e-3),  # Updated regularizer
+                                           kernel_regularizer=tf.keras.regularizers.l2(1e-3),
                                            name='mlp_fc_' + str(i))(hidden)
         return hidden
 
