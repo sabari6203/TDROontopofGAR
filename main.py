@@ -4,7 +4,8 @@ import utils
 import time
 import pickle
 import argparse
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import numpy as np
 import pandas as pd
 from pprint import pprint
