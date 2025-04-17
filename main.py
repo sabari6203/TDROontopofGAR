@@ -118,9 +118,16 @@ batch_count = 0
 item_index = np.arange(item_node_num)
 
 # model config
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
-sess = tf.Session(config=config)
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+        print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+    except RuntimeError as e:
+        print(e)
+sess = tf.compat.v1.Session()
 model = eval(args.model)(sess, args, emb.shape[-1], content_data.shape[-1])
 
 save_dir = './GAR/model_save/'
