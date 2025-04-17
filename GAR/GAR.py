@@ -7,28 +7,27 @@ def build_mlp(mlp_in, hidden_dims, act, drop_rate, is_training, scope_name, bn_f
         hidden = mlp_in
         if bn_first:
             hidden = tf.layers.batch_normalization(hidden,
-                                                   training=is_training,
-                                                   scale=False,
-                                                   name='mlp_bn_1')
-        hidden = tf.layers.dense(hidden,
-                                 hidden_dims[0],
-                                 name="mlp_fc_1",
-                                 kernel_initializer=tf.glorot_uniform_initializer(),
-                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+                                                 training=is_training,
+                                                 scale=False,
+                                                 name='mlp_bn_1')
+        # Replace tf.layers.dense with tf.keras.layers.Dense
+        hidden = tf.keras.layers.Dense(hidden_dims[0],
+                                       kernel_initializer=tf.glorot_uniform_initializer(),
+                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                       name="mlp_fc_1")(hidden)
         for i in range(2, len(hidden_dims) + 1):
             if act == 'relu':
                 hidden = tf.nn.leaky_relu(hidden, alpha=0.01)
             hidden = tf.layers.batch_normalization(hidden,
-                                                   training=is_training,
-                                                   name='mlp_bn_' + str(i))
+                                                 training=is_training,
+                                                 name='mlp_bn_' + str(i))
             if act == 'tanh':
                 hidden = tf.nn.tanh(hidden)
             hidden = tf.layers.dropout(hidden, rate=drop_rate, training=is_training, name='mlp_drop_' + str(i))
-            hidden = tf.layers.dense(hidden,
-                                     hidden_dims[i - 1],
-                                     kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
-                                     kernel_initializer=tf.glorot_uniform_initializer(),
-                                     name='mlp_fc_' + str(i))
+            hidden = tf.keras.layers.Dense(hidden_dims[i - 1],
+                                           kernel_initializer=tf.glorot_uniform_initializer(),
+                                           kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                           name='mlp_fc_' + str(i))(hidden)
         return hidden
 
 
