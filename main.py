@@ -49,7 +49,7 @@ args.Ks = eval(args.Ks)
 timer = Timer(name='main')
 
 # Initialize ndcg module
-init(args)  # Add this line to initialize Ks and other globals
+init(args, device=device)  # Pass device as a keyword argument
 
 # Load data
 content_data = np.load(os.path.join(args.datadir, args.dataset, args.dataset + '_item_content.npy'))
@@ -58,6 +58,7 @@ content_data_tensor = torch.tensor(content_data, dtype=torch.float32, device=dev
 para_dict = pickle.load(open(args.datadir + args.dataset + '/convert_dict.pkl', 'rb'))
 train_data = pd.read_csv(args.datadir + args.dataset + '/warm_{}.csv'.format(args.train_set), dtype=np.int64).values
 
+# ... (rest of the code remains the same)
 # Load embedding
 t0 = time.time()
 emb_path = os.path.join(args.datadir, args.dataset, "{}.npy".format(args.embed_meth))
