@@ -30,7 +30,7 @@ parser.add_argument('--n_test_user', type=int, default=2000)
 parser.add_argument('--embed_meth', type=str, default='ncf', help='Recommender')
 parser.add_argument('--batch_size', type=int, default=1024, help='Normal batch size.')
 parser.add_argument('--train_set', type=str, default='map', choices=['map', 'emb'])
-parser.add_argument('--max_epoch', type=int, default=1000)
+parser.add_argument('--max_epoch', type=int, default=200)  # Change from 1000 to 200 for faster testing
 parser.add_argument('--restore', type=str, default="")
 parser.add_argument('--patience', type=int, default=10, help='Early stop patience.')
 
