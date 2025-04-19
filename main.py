@@ -7,7 +7,7 @@ import pandas as pd
 from torch.utils.data import DataLoader
 import torch
 from GAR.GAR import GAR
-from metric.ndcg import test
+from metric.ndcg import test, init  # Import init function
 from utils import Timer, bpr_neg_samp
 
 # Argument parser
@@ -48,10 +48,13 @@ if torch.cuda.is_available():
 args.Ks = eval(args.Ks)
 timer = Timer(name='main')
 
+# Initialize ndcg module
+init(args)  # Add this line to initialize Ks and other globals
+
 # Load data
 content_data = np.load(os.path.join(args.datadir, args.dataset, args.dataset + '_item_content.npy'))
 content_data = np.concatenate([np.zeros([1, content_data.shape[-1]]), content_data], axis=0)
-content_data_tensor = torch.tensor(content_data, dtype=torch.float32, device=device)  # Convert to tensor once
+content_data_tensor = torch.tensor(content_data, dtype=torch.float32, device=device)
 para_dict = pickle.load(open(args.datadir + args.dataset + '/convert_dict.pkl', 'rb'))
 train_data = pd.read_csv(args.datadir + args.dataset + '/warm_{}.csv'.format(args.train_set), dtype=np.int64).values
 
