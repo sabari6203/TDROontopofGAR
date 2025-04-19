@@ -1,175 +1,111 @@
-import numpy as np
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.autograd import Variable
 
+class MLP(nn.Module):
+    def __init__(self, input_dim, hidden_dims, act='tanh', drop_rate=0.1, bn_first=True):
+        super(MLP, self).__init__()
+        layers = []
+        if bn_first:
+            layers.append(nn.BatchNorm1d(input_dim))
+        layers.append(nn.Linear(input_dim, hidden_dims[0]))
+        layers.append(nn.LeakyReLU(0.01) if act == 'relu' else nn.Tanh())
+        layers.append(nn.Dropout(drop_rate))
+        
+        for i in range(1, len(hidden_dims)):
+            layers.append(nn.BatchNorm1d(hidden_dims[i-1]))
+            layers.append(nn.Linear(hidden_dims[i-1], hidden_dims[i]))
+            layers.append(nn.LeakyReLU(0.01) if act == 'relu' else nn.Tanh())
+            layers.append(nn.Dropout(drop_rate))
+        
+        self.mlp = nn.Sequential(*layers)
+        self.apply(self._init_weights)
+    
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            nn.init.xavier_uniform_(module.weight)
+            if module.bias is not None:
+                nn.init.constant_(module.bias, 0)
+    
+    def forward(self, x):
+        return self.mlp(x)
 
-def build_mlp(inputs, hid_dims, act, drop_rate, is_training, name, norm=True, bn_first=False):
-    hidden = inputs
-    for i, dim in enumerate(hid_dims):
-        if norm and bn_first:
-            hidden = tf.compat.v1.keras.layers.BatchNormalization(name=f'{name}_bn{i}')(hidden, training=is_training)
-
-        hidden = tf.compat.v1.keras.layers.Dense(dim, name=f'{name}_fc{i}')(hidden)
-
-        if norm and not bn_first:
-            hidden = tf.compat.v1.keras.layers.BatchNormalization(name=f'{name}_bn{i}')(hidden, training=is_training)
-
-        hidden = tf.nn.dropout(hidden, rate=drop_rate, name=f'{name}_drop{i}')
-        hidden = tf.nn.relu(hidden, name=f'{name}_act{i}') if act == 'relu' else tf.keras.activations.get(act)(hidden)
-
-    return hidden
-
-
-
-
-
-class GAR(object):
-    def __init__(self, sess, args, emb_dim, content_dim):
-        self.sess = sess
+class GAR(nn.Module):
+    def __init__(self, emb_dim, content_dim, g_layer=[200, 200], d_layer=[200, 200], 
+                 g_act='tanh', d_act='tanh', g_drop=0.1, d_drop=0.5, alpha=0.05, beta=0.1):
+        super(GAR, self).__init__()
         self.emb_dim = emb_dim
         self.content_dim = content_dim
-        self.g_lr = 1e-3
-        self.d_lr = 1e-3
-        self.g_drop = 0.1
-        self.d_drop = 0.5
-        self.g_layer = [200, 200]
-        self.d_layer = [200, 200]
-        self.g_act = 'tanh'
-        self.d_act = 'tanh'
-
-        self.content = tf.compat.v1.placeholder(tf.float32, [None, content_dim], name='condition')
-        self.real_emb = tf.compat.v1.placeholder(tf.float32, [None, emb_dim], name='real_emb')
-        self.neg_emb = tf.compat.v1.placeholder(tf.float32, [None, emb_dim], name='neg_emb')
-        self.opp_emb = tf.compat.v1.placeholder(tf.float32, [None, emb_dim], name='opp_emb')
-        self.g_training = tf.compat.v1.placeholder(tf.bool, name='G_is_training')
-        self.d_training = tf.compat.v1.placeholder(tf.bool, name='D_is_training')
-
-        # build generator and discriminator's output
-        self.gen_emb = self.build_generator(
-            self.content, self.g_layer, self.g_act, self.g_drop, self.g_training, False
-        )
-
-        # D loss
-        uemb = tf.tile(self.opp_emb, [3, 1])
-        iemb = tf.concat([self.real_emb, self.neg_emb, self.gen_emb], axis=0)
-        D_out = self.build_discriminator(uemb, iemb, self.d_layer, self.d_act, self.d_drop, self.d_training, False)
-
-        self.D_out = tf.transpose(tf.reshape(D_out, [3, -1]))
-        self.real_logit = tf.gather(self.D_out, indices=[0], axis=1)
-        self.neg_logit = tf.gather(self.D_out, indices=[1], axis=1)
-        self.d_fake_logit = tf.gather(self.D_out, indices=[2], axis=1)
-
-        self.d_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            logits=self.real_logit - (1 - args.beta) * self.d_fake_logit - args.beta * self.neg_logit,
-            labels=tf.ones_like(self.real_logit)))
-        self.d_loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES, scope='D'))
-
-        # G loss
-        self.g_out = self.build_discriminator(self.opp_emb, self.gen_emb,
-                                              self.d_layer, self.d_act, self.d_drop,
-                                              self.d_training, True)
-        self.d_out = self.build_discriminator(self.opp_emb, self.real_emb,
-                                              self.d_layer, self.d_act, self.d_drop,
-                                              self.d_training, True)
-
-        self.g_loss = (1.0 - args.alpha) * tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            logits=self.g_out - self.d_out, labels=tf.ones_like(self.g_out)))
-        self.sim_loss = args.alpha * tf.reduce_mean(tf.abs(self.gen_emb - self.real_emb))  # emb similarity
-        self.g_loss += self.sim_loss
-        self.g_loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES, scope='G'))
-
-        # update
-        d_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='D')
-        with tf.control_dependencies(d_update_ops):
-            self.d_optimizer = tf.train.AdamOptimizer(self.d_lr).minimize(self.d_loss,
-                                                                          var_list=tf.get_collection(
-                                                                              tf.GraphKeys.TRAINABLE_VARIABLES,
-                                                                              scope='D'))
-        g_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='G')
-        with tf.control_dependencies(g_update_ops):
-            self.g_optimizer = tf.train.AdamOptimizer(self.g_lr).minimize(self.g_loss,
-                                                                          var_list=tf.get_collection(
-                                                                              tf.GraphKeys.TRAINABLE_VARIABLES,
-                                                                              scope='G'))
-
-        # get user rating through dot
-        self.uemb = tf.placeholder(tf.float32, [None, self.emb_dim], name='user_embedding')
-        self.iemb = tf.placeholder(tf.float32, [None, self.emb_dim], name='item_embedding')
-        self.user_rating = tf.matmul(self.uemb, self.iemb, transpose_b=True)
-
-        # rank user rating
-        self.rat = tf.placeholder(tf.float32, [None, None], name='user_rat')
-        self.k = tf.placeholder(tf.int32, name='atK')
-        self.top_score, self.top_item_index = tf.nn.top_k(self.rat, k=self.k)
-
-        # get transformed embeddings
-        self.user_ori_emb = tf.placeholder(tf.float32, [None, emb_dim], name='ori_user_emb')
-        self.item_ori_emb = tf.placeholder(tf.float32, [None, emb_dim], name='ori_item_emb')
-        with tf.variable_scope("D", reuse=True):
-            self.warm_user_emb = build_mlp(self.user_ori_emb, self.d_layer, self.d_act, self.d_drop,
-                                           False, 'user_emb', bn_first=True)
-            self.warm_item_emb = build_mlp(self.item_ori_emb, self.d_layer, self.d_act, self.d_drop,
-                                           False, 'item_emb', bn_first=True)
-
-        self.sess.run(tf.global_variables_initializer())
-        print([v.name for v in tf.trainable_variables()])
-
-    def build_generator(self, condition, hid_dims, act, drop_rate, training, reuse):
-        with tf.variable_scope('G', reuse=reuse):
-            gen_emb = build_mlp(condition, hid_dims, act, drop_rate, training, 'E0', False)
-        return gen_emb
-
-    def build_discriminator(self, uembs, iembs, hid_dims, act, drop_rate, training, reuse):
-        with tf.variable_scope("D", reuse=reuse):
-            out_uemb = build_mlp(uembs, hid_dims, act, drop_rate, training, 'user_emb', bn_first=True)
-            out_iemb = build_mlp(iembs, hid_dims, act, drop_rate, training, 'item_emb', bn_first=True)
-            out = tf.reduce_sum(out_uemb * out_iemb, axis=-1)  # train
-        return out
-
-    def train_d(self, batch_uemb, batch_iemb, batch_neg_iemb, batch_content):
-        _, d_loss = self.sess.run([self.d_optimizer, self.d_loss],
-                                  feed_dict={self.opp_emb: batch_uemb,
-                                             self.real_emb: batch_iemb,
-                                             self.neg_emb: batch_neg_iemb,
-                                             self.content: batch_content,
-                                             self.d_training: True,
-                                             self.g_training: False,
-                                             })
-        return [d_loss]
-
-    def train_g(self, batch_uemb, batch_iemb, batch_content):
-        _, g_loss, sim_loss = self.sess.run([self.g_optimizer, self.g_loss, self.sim_loss],
-                                            feed_dict={self.opp_emb: batch_uemb,
-                                                       self.real_emb: batch_iemb,
-                                                       self.content: batch_content,
-                                                       self.d_training: False,
-                                                       self.g_training: True,
-                                                       })
-        return [g_loss, sim_loss]
-
+        self.alpha = alpha
+        self.beta = beta
+        
+        # Generator
+        self.generator = MLP(content_dim, g_layer, g_act, g_drop, bn_first=False)
+        
+        # Discriminator
+        self.discriminator = nn.Module()
+        self.discriminator.user_mlp = MLP(emb_dim, d_layer, d_act, d_drop, bn_first=True)
+        self.discriminator.item_mlp = MLP(emb_dim, d_layer, d_act, d_drop, bn_first=True)
+        
+        # Optimizers
+        self.g_optimizer = optim.Adam(self.generator.parameters(), lr=1e-3, weight_decay=1e-3)
+        self.d_optimizer = optim.Adam(self.discriminator.parameters(), lr=1e-3, weight_decay=1e-3)
+        
+        # Loss functions
+        self.bce_loss = nn.BCEWithLogitsLoss()
+    
+    def forward_generator(self, content, training=True):
+        return self.generator(content)
+    
+    def forward_discriminator(self, uemb, iemb, training=True):
+        uemb_out = self.discriminator.user_mlp(uemb)
+        iemb_out = self.discriminator.item_mlp(iemb)
+        return torch.sum(uemb_out * iemb_out, dim=-1)
+    
+    def train_step(self, content, real_emb, neg_emb, opp_emb, args):
+        batch_size = content.size(0)
+        
+        # Train Discriminator
+        self.d_optimizer.zero_grad()
+        gen_emb = self.forward_generator(content, training=True)
+        
+        uemb = opp_emb.repeat(3, 1)
+        iemb = torch.cat([real_emb, neg_emb, gen_emb], dim=0)
+        d_out = self.forward_discriminator(uemb, iemb, training=True)
+        
+        d_out = d_out.view(3, -1).t()
+        real_logit, neg_logit, fake_logit = d_out[:, 0], d_out[:, 1], d_out[:, 2]
+        
+        d_loss = self.bce_loss(real_logit - (1 - args.beta) * fake_logit - args.beta * neg_logit, 
+                              torch.ones_like(real_logit))
+        d_loss.backward()
+        self.d_optimizer.step()
+        
+        # Train Generator
+        self.g_optimizer.zero_grad()
+        gen_emb = self.forward_generator(content, training=True)
+        g_out = self.forward_discriminator(opp_emb, gen_emb, training=True)
+        d_out = self.forward_discriminator(opp_emb, real_emb, training=True)
+        
+        g_adv_loss = self.bce_loss(g_out - d_out, torch.ones_like(g_out))
+        sim_loss = torch.mean(torch.abs(gen_emb - real_emb))
+        g_loss = (1.0 - self.alpha) * g_adv_loss + self.alpha * sim_loss
+        g_loss.backward()
+        self.g_optimizer.step()
+        
+        return d_loss.item(), g_loss.item(), sim_loss.item()
+    
     def get_item_emb(self, content, item_emb, warm_item, cold_item):
-        out_emb = np.copy(item_emb)
-        out_emb[cold_item] = self.sess.run(self.gen_emb, feed_dict={self.content: content[cold_item],
-                                                                    self.g_training: False})
-        out_emb = self.sess.run(self.warm_item_emb, feed_dict={self.item_ori_emb: out_emb})
-        return out_emb
-
+        item_emb = item_emb.clone()
+        item_emb[cold_item] = self.forward_generator(content[cold_item], training=False)
+        with torch.no_grad():
+            item_emb = self.discriminator.item_mlp(item_emb)
+        return item_emb
+    
     def get_user_emb(self, user_emb):
-        trans_user_emb = self.sess.run(self.warm_user_emb, feed_dict={self.user_ori_emb: user_emb})
-        return trans_user_emb
-
-    def get_user_rating(self, uids, iids, uemb, iemb):
-        user_rat = self.sess.run(self.user_rating,
-                                 feed_dict={self.uemb: uemb[uids],
-                                            self.iemb: iemb[iids],
-                                            })
-        return user_rat
-
-    def get_ranked_rating(self, ratings, k):
-        ranked_score, ranked_index = self.sess.run([self.top_score, self.top_item_index],
-                                                 feed_dict={self.rat: ratings,
-                                                            self.k: k})
-        return ranked_score, ranked_index
-
-
-
+        with torch.no_grad():
+            return self.discriminator.user_mlp(user_emb)
+    
+    def get_user_rating(self, uemb, iemb):
+        return torch.matmul(uemb, iemb.t())
