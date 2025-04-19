@@ -79,7 +79,7 @@ class GAR(nn.Module):
     def forward_discriminator(self, uemb, iemb, training=True):
         return self.discriminator(uemb, iemb)
 
-    def train_step(self, content, real_emb, neg_emb, opp_emb):
+    def train_step(self, content, real_emb, neg_emb, opp_emb,args):
         batch_size = content.size(0)
 
         # Train Discriminator
