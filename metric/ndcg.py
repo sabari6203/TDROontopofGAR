@@ -34,8 +34,8 @@ def test(get_topk, get_user_rating, ts_nei, ts_user, exclude_pair_cnt, masked_it
         groundTrue = [list(ts_nei[u]) for u in batch_user]
         top_scores, top_item_index = get_topk(rating_all_item, max_K)  # Pass tensor
 
-        score_list.append(top_scores.cpu().numpy())  # Convert to NumPy for storage
-        rating_list.append(top_item_index.cpu().numpy())  # Convert to NumPy for storage
+        score_list.append(top_scores.cpu().numpy())  # Convert tensor to NumPy
+        rating_list.append(top_item_index)  # Already a NumPy array, no need for .cpu()
         groundTrue_list.append(groundTrue)
 
     X = zip(rating_list, groundTrue_list)
