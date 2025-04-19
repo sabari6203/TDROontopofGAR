@@ -32,7 +32,7 @@ parser.add_argument('--batch_size', type=int, default=1024, help='Normal batch s
 parser.add_argument('--train_set', type=str, default='map', choices=['map', 'emb'])
 parser.add_argument('--max_epoch', type=int, default=200)  # Change from 1000 to 200 for faster testing
 parser.add_argument('--restore', type=str, default="")
-parser.add_argument('--patience', type=int, default=200, help='Early stop patience.')
+parser.add_argument('--patience', type=int, default=10, help='Early stop patience.')
 
 # Cold-start model parameter
 parser.add_argument('--alpha', type=float, default=0.1, help='param in GAR')
