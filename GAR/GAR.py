@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 
+
 class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dims, act='tanh', drop_rate=0.1, bn_first=True):
         super(MLP, self).__init__()
@@ -33,7 +34,7 @@ class MLP(nn.Module):
 
 class GAR(nn.Module):
     def __init__(self, emb_dim, content_dim, g_layer=[200, 200], d_layer=[200, 200], 
-                 g_act='tanh', d_act='tanh', g_drop=0.1, d_drop=0.5, alpha=0.05, beta=0.1):
+                g_act='tanh', d_act='tanh', g_drop=0.1, d_drop=0.5, alpha=0.05, beta=0.1):
         super(GAR, self).__init__()
         self.emb_dim = 64  # Force embedding size to 64 as per paper
         self.content_dim = content_dim
@@ -42,7 +43,10 @@ class GAR(nn.Module):
         
         # Generator
         self.generator = MLP(content_dim, g_layer, g_act, g_drop, bn_first=False)
-        self.gen_projection = nn.Linear(g_layer[-1], self.emb_dim)  # Project from 200 to 64
+        self.gen_projection = nn.Linear(g_layer[-1], self.emb_dim)
+        nn.init.xavier_uniform_(self.gen_projection.weight)  # Initialize projection weights
+        if self.gen_projection.bias is not None:
+            nn.init.constant_(self.gen_projection.bias, 0)  # Initialize bias
         
         # Discriminator
         self.discriminator = nn.Module()
