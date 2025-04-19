@@ -35,7 +35,7 @@ class GAR(nn.Module):
     def __init__(self, emb_dim, content_dim, g_layer=[200, 200], d_layer=[200, 200], 
                  g_act='tanh', d_act='tanh', g_drop=0.1, d_drop=0.5, alpha=0.05, beta=0.1):
         super(GAR, self).__init__()
-        self.emb_dim = emb_dim
+        self.emb_dim = 64  # Force embedding size to 64 as per paper
         self.content_dim = content_dim
         self.alpha = alpha
         self.beta = beta
