@@ -66,6 +66,10 @@ user_node_num = max(para_dict['user_array']) + 1
 item_node_num = max(para_dict['item_array']) + 1
 emb = np.load(emb_path)
 print(f"Embedding shape: {emb.shape}")
+if emb.shape[1] != 64:
+    projection = nn.Linear(emb.shape[1], 64).to(device)
+    emb = projection(torch.tensor(emb, dtype=torch.float32).to(device)).cpu().numpy()
+    print(f"Projected embedding shape: {emb.shape}")
 user_emb = torch.tensor(emb[:user_node_num], dtype=torch.float32).to(device)
 item_emb = torch.tensor(emb[user_node_num:], dtype=torch.float32).to(device)
 timer.logging('Embeddings are loaded from {}'.format(emb_path))
