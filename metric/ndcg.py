@@ -1,14 +1,14 @@
 import numpy as np
 import torch
 
-def init(args, device='cpu'):  # Add device parameter with default value
+def init(args, device='cpu'):
     global Ks, TEST_BATCH_SIZE, LOG_ARANGE, max_K, DEVICE
     print('Init for %s' % args.dataset)
     TEST_BATCH_SIZE = args.test_batch_us
     Ks = args.Ks
     max_K = max(Ks)
     LOG_ARANGE = np.log2(np.arange(max_K + 2) + 1e-9)
-    DEVICE = device  # Assign the passed device
+    DEVICE = device
 
 def test(get_topk, get_user_rating, ts_nei, ts_user, exclude_pair_cnt, masked_items=None, val=True, device='cpu'):
     results = {'precision': np.zeros(len(Ks)),
@@ -17,25 +17,25 @@ def test(get_topk, get_user_rating, ts_nei, ts_user, exclude_pair_cnt, masked_it
     rating_list = []
     score_list = []
     groundTrue_list = []
-    batch_size = TEST_BATCH_SIZE
 
+    batch_size = TEST_BATCH_SIZE
     for i, beg in enumerate(range(0, len(ts_user), batch_size)):
         end = min(beg + batch_size, len(ts_user))
         batch_user = ts_user[beg:end]
-        rating_all_item = get_user_rating(batch_user).cpu().numpy()
+        rating_all_item = get_user_rating(batch_user)  # Keep as tensor
 
-        # Exclude pairs
-        exclude_pair = exclude_pair_cnt[0][exclude_pair_cnt[1][i]:exclude_pair_cnt[1][i + 1]]
+        # Exclude pairs (convert exclude_pair to tensor for indexing)
+        exclude_pair = torch.tensor(exclude_pair_cnt[0][exclude_pair_cnt[1][i]:exclude_pair_cnt[1][i + 1]], device=device)
         rating_all_item[exclude_pair[:, 0], exclude_pair[:, 1]] = -1e10
 
         if masked_items is not None:
             rating_all_item[:, masked_items] = -1e10
 
         groundTrue = [list(ts_nei[u]) for u in batch_user]
-        top_scores, top_item_index = get_topk(rating_all_item, max_K)
+        top_scores, top_item_index = get_topk(rating_all_item, max_K)  # Pass tensor
 
-        score_list.append(top_scores)
-        rating_list.append(top_item_index)
+        score_list.append(top_scores.cpu().numpy())  # Convert to NumPy for storage
+        rating_list.append(top_item_index.cpu().numpy())  # Convert to NumPy for storage
         groundTrue_list.append(groundTrue)
 
     X = zip(rating_list, groundTrue_list)
@@ -99,5 +99,5 @@ def test_one_batch(X):
             'ndcg': np.array(ndcg)}
 
 def get_ranked_rating(ratings, k):
-    _, indices = torch.topk(torch.tensor(ratings, device=DEVICE), k, dim=1)
+    _, indices = torch.topk(ratings, k, dim=1)
     return ratings[:, :k], indices.cpu().numpy()
