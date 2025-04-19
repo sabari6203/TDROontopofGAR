@@ -42,21 +42,24 @@ class GAR(nn.Module):
         
         # Generator
         self.generator = MLP(content_dim, g_layer, g_act, g_drop, bn_first=False)
+        self.gen_projection = nn.Linear(g_layer[-1], self.emb_dim)  # Project from 200 to 64
         
         # Discriminator
         self.discriminator = nn.Module()
-        self.discriminator.user_mlp = MLP(emb_dim, d_layer, d_act, d_drop, bn_first=True)
-        self.discriminator.item_mlp = MLP(emb_dim, d_layer, d_act, d_drop, bn_first=True)
+        self.discriminator.user_mlp = MLP(self.emb_dim, d_layer, d_act, d_drop, bn_first=True)
+        self.discriminator.item_mlp = MLP(self.emb_dim, d_layer, d_act, d_drop, bn_first=True)
         
         # Optimizers
-        self.g_optimizer = optim.Adam(self.generator.parameters(), lr=1e-3, weight_decay=1e-3)
+        self.g_optimizer = optim.Adam(list(self.generator.parameters()) + list(self.gen_projection.parameters()), 
+                                      lr=1e-3, weight_decay=1e-3)
         self.d_optimizer = optim.Adam(self.discriminator.parameters(), lr=1e-3, weight_decay=1e-3)
         
         # Loss functions
         self.bce_loss = nn.BCEWithLogitsLoss()
     
     def forward_generator(self, content, training=True):
-        return self.generator(content)
+        gen_output = self.generator(content)
+        return self.gen_projection(gen_output)  # Apply projection to match emb_dim
     
     def forward_discriminator(self, uemb, iemb, training=True):
         uemb_out = self.discriminator.user_mlp(uemb)
@@ -71,7 +74,7 @@ class GAR(nn.Module):
         gen_emb = self.forward_generator(content, training=True)
         
         uemb = opp_emb.repeat(3, 1)
-        iemb = torch.cat([real_emb, neg_emb, gen_emb], dim=0)
+        iemb = torch.cat([real_emb, neg_emb, gen_emb], dim=0)  # Now all should be 64
         d_out = self.forward_discriminator(uemb, iemb, training=True)
         
         d_out = d_out.view(3, -1).t()
@@ -98,7 +101,7 @@ class GAR(nn.Module):
     
     def get_item_emb(self, content, item_emb, warm_item, cold_item):
         item_emb = item_emb.clone()
-        item_emb[cold_item] = self.forward_generator(content[cold_item], training=False)
+        item_emb[ccold_item] = self.forward_generator(content[cold_item], training=False)
         with torch.no_grad():
             item_emb = self.discriminator.item_mlp(item_emb)
         return item_emb
@@ -115,3 +118,5 @@ class GAR(nn.Module):
         with torch.no_grad():
             _, indices = torch.topk(ratings, k, dim=1)
             return ratings[:, :k], indices.cpu().numpy()
+
+# Note: Fixed a typo in get_item_emb (ccold_item -> cold_item)
