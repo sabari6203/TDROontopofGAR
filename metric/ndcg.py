@@ -1,14 +1,14 @@
 import numpy as np
 import torch
 
-def init(args):
+def init(args, device='cpu'):  # Add device parameter with default value
     global Ks, TEST_BATCH_SIZE, LOG_ARANGE, max_K, DEVICE
     print('Init for %s' % args.dataset)
     TEST_BATCH_SIZE = args.test_batch_us
     Ks = args.Ks
     max_K = max(Ks)
     LOG_ARANGE = np.log2(np.arange(max_K + 2) + 1e-9)
-    DEVICE = args.device
+    DEVICE = device  # Assign the passed device
 
 def test(get_topk, get_user_rating, ts_nei, ts_user, exclude_pair_cnt, masked_items=None, val=True, device='cpu'):
     results = {'precision': np.zeros(len(Ks)),
