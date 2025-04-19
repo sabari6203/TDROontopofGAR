@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader
 import torch
-from GAR import GAR
+from GAR.GAR import GAR
 from metric.ndcg import test
 from utils import Timer, bpr_neg_samp
 
