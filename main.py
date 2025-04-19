@@ -7,7 +7,7 @@ import pandas as pd
 from torch.utils.data import DataLoader
 import torch
 from GAR import GAR
-from ndcg import test
+from metric.ndcg import test
 from utils import Timer, bpr_neg_samp
 
 # Argument parser
