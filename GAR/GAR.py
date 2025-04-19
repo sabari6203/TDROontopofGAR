@@ -101,7 +101,7 @@ class GAR(nn.Module):
     
     def get_item_emb(self, content, item_emb, warm_item, cold_item):
         item_emb = item_emb.clone()
-        item_emb[ccold_item] = self.forward_generator(content[cold_item], training=False)
+        item_emb[cold_item] = self.forward_generator(content[cold_item], training=False)
         with torch.no_grad():
             item_emb = self.discriminator.item_mlp(item_emb)
         return item_emb
