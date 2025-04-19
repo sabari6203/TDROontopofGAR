@@ -1,5 +1,5 @@
 import numpy as np
-
+import torch
 
 def init(args):
     global Ks, TEST_BATCH_SIZE, LOG_ARANGE, max_K, DEVICE
@@ -8,9 +8,9 @@ def init(args):
     Ks = args.Ks
     max_K = max(Ks)
     LOG_ARANGE = np.log2(np.arange(max_K + 2) + 1e-9)
+    DEVICE = args.device
 
-
-def test(get_topk, get_user_rating, ts_nei, ts_user, exclude_pair_cnt, masked_items=None, val=True):
+def test(get_topk, get_user_rating, ts_nei, ts_user, exclude_pair_cnt, masked_items=None, val=True, device='cpu'):
     results = {'precision': np.zeros(len(Ks)),
                'recall': np.zeros(len(Ks)),
                'ndcg': np.zeros(len(Ks))}
@@ -22,16 +22,16 @@ def test(get_topk, get_user_rating, ts_nei, ts_user, exclude_pair_cnt, masked_it
     for i, beg in enumerate(range(0, len(ts_user), batch_size)):
         end = min(beg + batch_size, len(ts_user))
         batch_user = ts_user[beg:end]
-        rating_all_item = get_user_rating(batch_user)
+        rating_all_item = get_user_rating(batch_user).cpu().numpy()
 
-        # ================== exclude =======================
+        # Exclude pairs
         exclude_pair = exclude_pair_cnt[0][exclude_pair_cnt[1][i]:exclude_pair_cnt[1][i + 1]]
         rating_all_item[exclude_pair[:, 0], exclude_pair[:, 1]] = -1e10
 
         if masked_items is not None:
             rating_all_item[:, masked_items] = -1e10
-        # ===================================================
-        groundTrue = list(ts_nei[batch_user])
+
+        groundTrue = [list(ts_nei[u]) for u in batch_user]
         top_scores, top_item_index = get_topk(rating_all_item, max_K)
 
         score_list.append(top_scores)
@@ -50,7 +50,6 @@ def test(get_topk, get_user_rating, ts_nei, ts_user, exclude_pair_cnt, masked_it
     results['ndcg'] /= n_ts_user
     return results, np.concatenate(score_list, axis=0)
 
-
 def getLabel(test_data, pred_data):
     r = []
     for i in range(len(test_data)):
@@ -60,13 +59,7 @@ def getLabel(test_data, pred_data):
         r.append(pred)
     return np.array(r, dtype=np.float32)
 
-
 def RecallPrecision_ATk(test_data, r, k):
-    """
-    test_data should be a list? cause users may have different amount of pos items. shape (test_batch, k)
-    pred_data : shape (test_batch, k) NOTE: pred_data should be pre-sorted
-    k : top-k
-    """
     right_pred = r[:, :k].sum(1)
     precis_n = k
     recall_n = np.array([len(test_data[i]) for i in range(len(test_data))])
@@ -74,12 +67,7 @@ def RecallPrecision_ATk(test_data, r, k):
     precision = np.sum(right_pred) / precis_n
     return {'recall': recall, 'precision': precision}
 
-
 def NDCGatK_r(test_data, r, k):
-    """
-    Normalized Discounted Cumulative Gain
-    rel_i = 1 or 0, so 2^{rel_i} - 1 = 1 or 0
-    """
     assert len(r) == len(test_data)
     pred_data = r[:, :k]
 
@@ -96,7 +84,6 @@ def NDCGatK_r(test_data, r, k):
     ndcg[np.isnan(ndcg)] = 0.
     return np.sum(ndcg)
 
-
 def test_one_batch(X):
     sorted_items = X[0]
     groundTrue = X[1]
@@ -111,4 +98,6 @@ def test_one_batch(X):
             'precision': np.array(pre),
             'ndcg': np.array(ndcg)}
 
-
+def get_ranked_rating(ratings, k):
+    _, indices = torch.topk(torch.tensor(ratings, device=DEVICE), k, dim=1)
+    return ratings[:, :k], indices.cpu().numpy()
