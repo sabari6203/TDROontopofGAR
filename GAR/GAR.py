@@ -109,3 +109,9 @@ class GAR(nn.Module):
     
     def get_user_rating(self, uemb, iemb):
         return torch.matmul(uemb, iemb.t())
+    
+    def get_ranked_rating(self, ratings, k):
+        """Return top-k scores and indices for the given ratings."""
+        with torch.no_grad():
+            _, indices = torch.topk(ratings, k, dim=1)
+            return ratings[:, :k], indices.cpu().numpy()
