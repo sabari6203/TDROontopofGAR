@@ -6,9 +6,12 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader
 import torch
+import torch.nn as nn  # Add this line
 from GAR.GAR import GAR
-from metric.ndcg import test, init  # Import init function
+from metric.ndcg import test, init
 from utils import Timer, bpr_neg_samp
+
+# ... (rest of the code remains the same)
 
 # Argument parser
 parser = argparse.ArgumentParser()
