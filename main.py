@@ -32,11 +32,11 @@ parser.add_argument('--batch_size', type=int, default=1024, help='Normal batch s
 parser.add_argument('--train_set', type=str, default='map', choices=['map', 'emb'])
 parser.add_argument('--max_epoch', type=int, default=200)  # Change from 1000 to 200 for faster testing
 parser.add_argument('--restore', type=str, default="")
-parser.add_argument('--patience', type=int, default=10, help='Early stop patience.')
+parser.add_argument('--patience', type=int, default=200, help='Early stop patience.')
 
 # Cold-start model parameter
-parser.add_argument('--alpha', type=float, default=0.05, help='param in GAR')
-parser.add_argument('--beta', type=float, default=0.1, help='param in GAR')
+parser.add_argument('--alpha', type=float, default=0.1, help='param in GAR')
+parser.add_argument('--beta', type=float, default=0.2, help='param in GAR')
 args, _ = parser.parse_known_args()
 
 # Set device and seed
@@ -65,6 +65,7 @@ emb_path = os.path.join(args.datadir, args.dataset, "{}.npy".format(args.embed_m
 user_node_num = max(para_dict['user_array']) + 1
 item_node_num = max(para_dict['item_array']) + 1
 emb = np.load(emb_path)
+print(f"Embedding shape: {emb.shape}")
 user_emb = torch.tensor(emb[:user_node_num], dtype=torch.float32).to(device)
 item_emb = torch.tensor(emb[user_node_num:], dtype=torch.float32).to(device)
 timer.logging('Embeddings are loaded from {}'.format(emb_path))
