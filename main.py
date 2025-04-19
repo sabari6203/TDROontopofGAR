@@ -51,6 +51,7 @@ timer = Timer(name='main')
 # Load data
 content_data = np.load(os.path.join(args.datadir, args.dataset, args.dataset + '_item_content.npy'))
 content_data = np.concatenate([np.zeros([1, content_data.shape[-1]]), content_data], axis=0)
+content_data_tensor = torch.tensor(content_data, dtype=torch.float32, device=device)  # Convert to tensor once
 para_dict = pickle.load(open(args.datadir + args.dataset + '/convert_dict.pkl', 'rb'))
 train_data = pd.read_csv(args.datadir + args.dataset + '/warm_{}.csv'.format(args.train_set), dtype=np.int64).values
 
@@ -134,7 +135,8 @@ for epoch in range(1, args.max_epoch + 1):
         t_train_begin = time.time()
         batch_lbs = torch.tensor(train_input[beg:end], dtype=torch.long, device=device)
 
-        content = torch.tensor(content_data[batch_lbs[:, 1]], dtype=torch.float32, device=device)
+        # Use tensor indexing with content_data_tensor
+        content = content_data_tensor[batch_lbs[:, 1]]
         d_loss, g_loss, sim_loss = model.train_step(
             content, user_emb[batch_lbs[:, 0]], item_emb[batch_lbs[:, 2]], user_emb[batch_lbs[:, 0]], args)
         loss = d_loss + g_loss
