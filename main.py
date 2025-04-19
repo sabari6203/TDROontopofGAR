@@ -71,7 +71,7 @@ emb = np.load(emb_path)
 print(f"Embedding shape: {emb.shape}")
 if emb.shape[1] != 64:
     projection = nn.Linear(emb.shape[1], 64).to(device)
-    emb = projection(torch.tensor(emb, dtype=torch.float32).to(device)).cpu().numpy()
+    emb = projection(torch.tensor(emb, dtype=torch.float32).to(device)).detach().cpu().numpy()  # Add .detach()
     print(f"Projected embedding shape: {emb.shape}")
 user_emb = torch.tensor(emb[:user_node_num], dtype=torch.float32).to(device)
 item_emb = torch.tensor(emb[user_node_num:], dtype=torch.float32).to(device)
